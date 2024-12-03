@@ -40,6 +40,7 @@ reference_distance_m = 0.25
 min_diameter_mm = 40
 max_diameter_mm = 180
 csv_filename = "contour_coordinates_mm_&_rad.csv"
+angle_deg_input = 45  # Hoek in graden (verander dit naar wens)
 
 try:
     while True:
@@ -79,42 +80,64 @@ try:
 
                         # Visualiseer het middenpunt
                         cv2.circle(color_image, (int(x), int(y)), 5, (0, 255, 255), -1)  # Geel punt voor het midden
-                        cv2.putText(color_image, f"Center: ({int(center_x_mm):.2f}, {int(center_y_mm):.2f})",
-                                    (int(x) + 10, int(y) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-                        contour_points_sorted = sorted(
-                            largest_contour,
-                            key=lambda point: np.arctan2(
-                                (point[0][1] / pixels_per_mm) - center_y_mm,
-                                (point[0][0] / pixels_per_mm) - center_x_mm
-                            )
-                        )
+                        # Bepaal het startpunt op de y-as afhankelijk van de hoek in graden
+                        angle_rad = np.radians(angle_deg_input)
+                        start_x = 0  # Startpunt ligt precies op de y-as
+                        start_y = center_y_mm + radius * np.sin(angle_rad)
 
+                        # Visualiseer het startpunt op de y-as
+                        cv2.circle(color_image, (int(start_x * pixels_per_mm), int(start_y * pixels_per_mm)), 5, (255, 0, 255), -1)
+                        cv2.putText(color_image, f"Start", (int(start_x * pixels_per_mm) + 10, int(start_y * pixels_per_mm) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                        # Toon de x- en y-as
+                        cv2.line(color_image, (int(x), int(y)), (int(x + 100), int(y)), (0, 255, 0), 2)  # x-as
+                        cv2.putText(color_image, "X", (int(x + 110), int(y) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                        cv2.line(color_image, (int(x), int(y)), (int(x), int(y - 100)), (255, 0, 0), 2)  # y-as
+                        cv2.putText(color_image, "Y", (int(x) - 20, int(y) - 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                        # Weergeef het eerste coördinaat van de contour
+                        first_point = largest_contour[0][0]
+                        first_pixel_x, first_pixel_y = first_point
+                        first_mm_x = first_pixel_x / pixels_per_mm
+                        first_mm_y = first_pixel_y / pixels_per_mm
+
+                        # Visualiseer het eerste coördinaat
+                        cv2.circle(color_image, (int(first_pixel_x), int(first_pixel_y)), 5, (0, 255, 0), -1)
+                        cv2.putText(color_image, f"First ({first_mm_x:.2f}, {first_mm_y:.2f})", (int(first_pixel_x) + 10, int(first_pixel_y) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                        # Opslaan van de coördinaten voor het CSV-bestand
                         x_coords_mm = []
-                        y_coords_rad = []
-                        for point in contour_points_sorted:
+                        y_coords_deg = []
+                        for point in largest_contour:
                             pixel_x, pixel_y = point[0]
                             mm_x = pixel_x / pixels_per_mm
                             mm_y = pixel_y / pixels_per_mm
 
-                            angle = np.arctan2(mm_y - center_y_mm, mm_x - center_x_mm)
-                            if angle < 0:
-                                angle += 2 * np.pi
+                            # Bereken het verschil ten opzichte van het middenpunt
+                            delta_x = mm_x - center_x_mm
+                            delta_y = mm_y - center_y_mm
 
-                            x_coords_mm.append(mm_x)
-                            y_coords_rad.append(angle)
+                            # Bereken de afstand (Stelling van Pythagoras)
+                            distance = np.sqrt(delta_x**2 + delta_y**2)
 
-                            pixel_x = int(mm_x * pixels_per_mm)
-                            pixel_y = int(mm_y * pixels_per_mm)
-                            cv2.circle(color_image, (pixel_x, pixel_y), 3, (0, 0, 255), -1)
+                            # Bereken de hoek in graden
+                            angle_rad = np.arctan2(delta_y, delta_x)
+                            angle_deg = np.degrees(angle_rad)
+                            if angle_deg < 0:
+                                angle_deg += 360
+
+                            x_coords_mm.append(distance)
+                            y_coords_deg.append(angle_deg)
 
                         with open(csv_filename, mode="w", newline="") as file:
                             writer = csv.writer(file)
-                            writer.writerow(["X (mm)", "Y (rad)"])
-                            writer.writerows(zip(x_coords_mm, y_coords_rad))
+                            writer.writerow(["Afstand (mm)", "Hoek (graden)"])
+                            writer.writerows(zip(x_coords_mm, y_coords_deg))
 
                         print(f"Coördinaten opgeslagen in {csv_filename}")
-                        send_coordinates_to_twincat(x_coords_mm, y_coords_rad)
+                        send_coordinates_to_twincat(x_coords_mm, y_coords_deg)
 
                         cv2.drawContours(color_image, [largest_contour], -1, (0, 255, 0), 2)
                         cv2.circle(color_image, (int(x), int(y)), int(radius), (255, 0, 0), 2)
