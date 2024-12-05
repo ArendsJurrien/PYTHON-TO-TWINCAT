@@ -137,11 +137,11 @@ try:
                             first_point_y = int(y)
 
                             # Toon de coördinaten van het eerste punt op het beeld
-                            cv2.putText(color_image, f"First X: {first_x:.2f} mm, Angle: {first_angle:.2f} degrees",
-                                        (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                            cv2.putText(color_image, f"First Coordinates: {first_x:.2f} mm, Angle: {first_angle:.2f} degrees",
+                                        (25, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
                         cv2.putText(color_image, f"Diameter: {diameter_mm:.2f} mm",
-                                    (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                                    (25, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
 
                         cv2.imshow("Tandwiel Resultaat", color_image)
                         cv2.imwrite("resultaat_tandwiel.png", color_image)

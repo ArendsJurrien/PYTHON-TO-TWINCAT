@@ -1,12 +1,12 @@
-import cv2
-import pyrealsense2 as rs
-import numpy as np
-import time
-import csv
-import pyads
+import cv2                      # OpenCV-bibliotheek voor beeldverwerking 
+import pyrealsense2 as rs       # Intel RealSense-bibliotheek voor camera-invoer
+import numpy as np              # NumPy voor numerieke berekeningen
+import time                     # Voor tijdsvertragingen
+import csv                      # Voor het schrijven van CSV-bestanden
+import pyads                    # Voor communicatie met een TwinCAT PLC
 
 # Functie voor het schrijven van de coördinaten naar TwinCAT
-def send_coordinates_to_twincat(x_coords, y_coords, plc_address="39.231.85.117.1.1", port=851):
+def send_coordinates_to_twincat(x_coords, y_coords, plc_address="39.231.85.117.1.1", port=851): 
     try:
         plc = pyads.Connection(plc_address, port)
         plc.open()
@@ -104,26 +104,16 @@ try:
                             x_coords_mm.append(distance)
                             y_coords_deg.append(angle_deg)
 
-                        # Bepaal de hoek van het eerste punt
-                        first_point_x, first_point_y = start_point[0]
-                        first_angle_rad = np.arctan2(first_point_y - y, first_point_x - x)
-                        first_angle_deg = np.degrees(first_angle_rad)
-                        first_angle_deg = (first_angle_deg + 90) % 360  # Aanpassen naar boven
-
-                        # Als het eerste punt 180 graden is, verschuif dan het hele contour
-                        if 170 <= first_angle_deg <= 190:
-                            angle_shift = 180  # Verschil om het eerste punt naar 0 graden te brengen
-                            y_coords_deg = [(angle + angle_shift) % 360 for angle in y_coords_deg]
-
                         with open(csv_filename, mode="w", newline="") as file:
                             writer = csv.writer(file)
                             writer.writerow(["Distance (mm)", "Angle (degrees)"])
                             for x, y in zip(x_coords_mm, y_coords_deg):
                                 writer.writerow([x, y])
-
+                        
                         send_coordinates_to_twincat(x_coords_mm, y_coords_deg)
 
                         # Markeer het eerste punt en pas de hoek aan voor de visualisatie
+                        first_point_x, first_point_y = start_point[0]
                         cv2.circle(color_image, (first_point_x, first_point_y), 3, (0, 0, 255), -1)
                         cv2.putText(color_image, "First Point", (first_point_x + 10, first_point_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
@@ -139,6 +129,10 @@ try:
                             # Toon de coördinaten van het eerste punt op het beeld
                             cv2.putText(color_image, f"First X: {first_x:.2f} mm, Angle: {first_angle:.2f} degrees",
                                         (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                        # Pas de hoek van het eerste punt aan zodat 0 graden naar boven wijst
+                        angle_deg_first_point = (np.degrees(np.arctan2(first_point_y - y, first_point_x - x)) + 90) % 360
+                        print(f"Adjusted angle for first point: {angle_deg_first_point:.2f} degrees")
 
                         cv2.putText(color_image, f"Diameter: {diameter_mm:.2f} mm",
                                     (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)

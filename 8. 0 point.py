@@ -121,12 +121,15 @@ try:  # Code uitvoeren waarvan je weet dat het mogelijk een fout kan veroorzaken
                             writer.writerow(["Distance (mm)", "Angle (degrees)"])
                             for x, y in zip(x_coords_mm, y_coords_deg):
                                 writer.writerow([x, y])
+                        
+                        # Voeg dit toe vlak na het aanmaken van de CSV en voor het tonen van de resultaten
+                        send_coordinates_to_twincat(x_coords_mm, y_coords_deg)
 
                         # Markeer het eerste punt
                         first_point_x, first_point_y = start_point[0]  # Coördinaten van het eerste punt
                         cv2.circle(color_image, (first_point_x, first_point_y), 3, (0, 0, 255), -1)  # Rood stipje
                         cv2.putText(color_image, "First Point", (first_point_x + 10, first_point_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)  # tekst coordinaat
-
+                        
                         cv2.putText(color_image, f"Diameter: {diameter_mm:.2f} mm",
                                     (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)  # Toon diameter
 
