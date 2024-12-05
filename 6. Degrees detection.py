@@ -40,7 +40,6 @@ reference_distance_m = 0.25
 min_diameter_mm = 40
 max_diameter_mm = 180
 csv_filename = "contour_coordinates_mm_&_degrees.csv"
-angle_deg_input = 45  # Hoek in graden (verander dit naar wens)
 
 try:
     while True:
@@ -82,11 +81,11 @@ try:
                         cv2.circle(color_image, (int(x), int(y)), 5, (0, 255, 255), -1)  # Geel punt voor het midden
 
                         # Toon de x- en y-as (omgedraaid, x verticaal, y horizontaal)
-                        cv2.line(color_image, (int(x), int(y)), (int(x), int(y - 100)), (0, 255, 0), 2)  # x-as (verticaal)
-                        cv2.putText(color_image, "X", (int(x) - 20, int(y) - 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                        cv2.line(color_image, (int(x), int(y)), (int(x + 100), int(y)), (255, 0, 0), 2)  # x-as (horizontaal)
+                        cv2.putText(color_image, "X", (int(x + 110), int(y) + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-                        cv2.line(color_image, (int(x), int(y)), (int(x + 100), int(y)), (255, 0, 0), 2)  # y-as (horizontaal)
-                        cv2.putText(color_image, "Y", (int(x + 110), int(y) + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                        cv2.line(color_image, (int(x), int(y)), (int(x), int(y - 100)), (0, 255, 0), 2)  # y-as (verticaal)
+                        cv2.putText(color_image, "Y", (int(x) - 20, int(y) - 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
                         # Zoek het punt dat het dichtst bij de x-as ligt
                         min_distance_to_x_axis = float('inf')
@@ -103,17 +102,6 @@ try:
                             if distance_to_x_axis < min_distance_to_x_axis:
                                 min_distance_to_x_axis = distance_to_x_axis
                                 start_point = (pixel_x, pixel_y)
-
-                        # Toon het startpunt met een rode stip en coördinaten
-                        if start_point:
-                            start_pixel_x, start_pixel_y = start_point
-                            start_mm_x = (start_pixel_x - x) / pixels_per_mm
-                            start_mm_y = (start_pixel_y - y) / pixels_per_mm
-
-                            cv2.circle(color_image, (int(start_pixel_x), int(start_pixel_y)), 5, (0, 0, 255), -1)  # Rode punt
-                            cv2.putText(color_image, f"({start_mm_x:.2f} mm, {start_mm_y:.2f} mm)", 
-                                        (int(start_pixel_x) + 10, int(start_pixel_y) - 10), 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
                         # Bereken de afstanden en hoeken vanaf het middenpunt
                         x_coords_mm = []
