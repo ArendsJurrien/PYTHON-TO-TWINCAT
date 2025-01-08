@@ -4,6 +4,47 @@ import numpy as np
 import time
 import csv
 import pyads
+import subprocess
+
+timeout_seconds = 15
+start_time = time.time()
+plc_address="39.231.85.117.1.1"
+port = 851
+
+
+def main():
+    plc = pyads.Connection(plc_address, port)
+    plc.open()
+
+    last_state = False  # Begin met laag (geen puls)
+
+    try:
+        while True:
+            # Lees de huidige staat van de startprocess-variabele
+            current_state = plc.read_by_name("Main.StartProcess", pyads.PLCTYPE_BOOL)
+            
+            # Detecteer de puls (rising edge)
+            if current_state and not last_state:
+                print("Puls gedetecteerd! Start proces.")
+                subprocess.Popen(["python", "12. Final.py"])
+                
+                # Meld aan TwinCAT dat Python actief is
+                plc.write_by_name("Main.PythonIsReady", True, pyads.PLCTYPE_BOOL)
+                
+            last_state = current_state  # Update de vorige staat
+
+            time.sleep(0.1)  # Poll interval om CPU-belasting te beperken
+
+    except Exception as e:
+        print(f"Fout: {e}")
+    finally:
+        plc.close()
+
+if __name__ == "__main__":
+    main()
+
+
+
 
 # Functie voor het schrijven van de coördinaten naar TwinCAT
 def send_coordinates_to_twincat(x_coords, y_coords, plc_address="39.231.85.117.1.1", port=851):
@@ -23,6 +64,26 @@ def send_coordinates_to_twincat(x_coords, y_coords, plc_address="39.231.85.117.1
     except Exception as e:
         print(f"Error: {e}")
 
+# Functie voor het schrijven van de status naar TwinCAT
+def send_text_to_twincat(text, plc_address="39.231.85.117.1.1", port=851):
+    try:
+        plc = pyads.Connection(plc_address, port)
+        plc.open()
+        
+        if plc.is_open:
+            # Schrijf het bericht naar de PLC
+            plc.write_by_name("Main.status_message", text, pyads.PLCTYPE_STRING)
+            print(f"Bericht '{text}' succesvol verzonden naar TwinCAT.")
+        else:
+            print("Kon geen verbinding maken met de PLC.")
+        
+        plc.close()
+    except Exception as e:
+        print(f"Fout bij verzenden: {e}")
+    
+
+
+
 # Initialiseer Intel RealSense D435 camera
 pipeline = rs.pipeline()
 config = rs.config()
@@ -39,16 +100,27 @@ min_diameter_mm = 40
 max_diameter_mm = 180
 csv_filename = "contour_coordinates_mm_&_degrees.csv"
 
+send_text_to_twincat("Searching for gear")
+
+
+
 try:
     while True:
         time.sleep(2)
         frames = pipeline.wait_for_frames()
         color_frame = frames.get_color_frame()
         depth_frame = frames.get_depth_frame()
-
+        
         if not color_frame or not depth_frame:
             print("Geen frames ontvangen. Probeer opnieuw.")
             continue
+      
+        #TIMEOUT TIMER
+        elapsed_time = time.time() - start_time
+        if elapsed_time > timeout_seconds:
+            #print("Timeout bereikt: geen tandwiel gevonden.")
+            send_text_to_twincat("Timeout. No gear found.")
+            break
 
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
@@ -58,7 +130,8 @@ try:
         edges = cv2.Canny(blurred, lower_threshold, upper_threshold)
 
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-
+       
+       
         if contours:
             largest_contour = max(contours, key=cv2.contourArea)
             (x, y), radius = cv2.minEnclosingCircle(largest_contour)
@@ -80,6 +153,9 @@ try:
                     if min_diameter_mm <= diameter_mm <= max_diameter_mm:
                         center_x_mm = x / pixels_per_mm
                         center_y_mm = y / pixels_per_mm
+
+                         # If gear is found send the status
+                        send_text_to_twincat("Gear found")
 
                         cv2.drawContours(color_image, [reordered_contour], -1, (0, 255, 0), 2)
                         #cv2.circle(color_image, (int(x), int(y)), int(radius), (255, 0, 0), 2)
@@ -120,8 +196,11 @@ try:
                             writer.writerow(["Distance (mm)", "Angle (degrees)"])
                             for x, y in zip(x_coords_mm, y_coords_deg):
                                 writer.writerow([x, y])
-
+                        send_text_to_twincat("Sending coordinates")
                         send_coordinates_to_twincat(x_coords_mm, y_coords_deg)
+                        send_text_to_twincat("Coordinates succesfully sended")
+                         # Sending status update when sending coordinates to twincat
+                        
 
                         # Markeer het eerste punt en pas de hoek aan voor de visualisatie
                         cv2.circle(color_image, (first_point_x, first_point_y), 3, (0, 0, 255), -1)
@@ -145,15 +224,21 @@ try:
 
                         cv2.imshow("Tandwiel Resultaat", color_image)
                         cv2.imwrite("resultaat_tandwiel.png", color_image)
-                        cv2.waitKey(0)
+                        #cv2.waitKey(0)
                         break
+                    
                     else:
                         print(f"Contour genegeerd: diameter ({diameter_mm:.2f} mm) ligt niet tussen {min_diameter_mm} mm en {max_diameter_mm} mm.")
+                    
                 else:
-                    print("Geen object gevonden.")
+                    print("Geen juist object gevonden (>0 cm).")
         else:
-            print("Geen contouren gevonden. Controleer het beeld en probeer opnieuw.")
+            print("No gear found.")
 
 finally:
     pipeline.stop()
     cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
+    

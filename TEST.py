@@ -52,8 +52,18 @@ try:
 
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
+        # Maak een masker voor de zwarte klem
+        lower_black = np.array([0, 0, 0])      # Onderste grens voor zwart
+        upper_black = np.array([75, 75, 75])  # Bovenste grens voor zwart
+        mask_black = cv2.inRange(color_image, lower_black, upper_black)
 
-        gray = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+        # Inverteer het masker om alleen niet-zwarte gebieden te behouden
+        mask_not_black = cv2.bitwise_not(mask_black)
+
+        # Pas het masker toe op het originele beeld
+        color_image_filtered = cv2.bitwise_and(color_image, color_image, mask=mask_not_black)
+
+        gray = cv2.cvtColor(color_image_filtered, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (1, 1), 0)
         edges = cv2.Canny(blurred, lower_threshold, upper_threshold)
 
@@ -82,10 +92,10 @@ try:
                         center_y_mm = y / pixels_per_mm
 
                         cv2.drawContours(color_image, [reordered_contour], -1, (0, 255, 0), 2)
-                        cv2.circle(color_image, (int(x), int(y)), int(radius), (255, 0, 0), 2)
-                        cv2.line(color_image, (int(x), 0), (int(x), color_image.shape[0]), (255, 0, 0), 2)
+                        #cv2.circle(color_image, (int(x), int(y)), int(radius), (255, 0, 0), 2)
+                        #cv2.line(color_image, (int(x), 0), (int(x), color_image.shape[0]), (255, 0, 0), 2)
                         cv2.putText(color_image, "X-axis", (int(x) + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                        cv2.line(color_image, (0, int(y)), (color_image.shape[1], int(y)), (0, 255, 0), 2)
+                        #cv2.line(color_image, (0, int(y)), (color_image.shape[1], int(y)), (0, 255, 0), 2)
                         cv2.putText(color_image, "Y-axis", (color_image.shape[1] - 100, int(y) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
                         x_coords_mm = []
@@ -137,11 +147,11 @@ try:
                             first_point_y = int(y)
 
                             # Toon de coördinaten van het eerste punt op het beeld
-                            cv2.putText(color_image, f"First X: {first_x:.2f} mm, Angle: {first_angle:.2f} degrees",
-                                        (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                            cv2.putText(color_image, f"First Coordinates: {first_x:.2f} mm, Angle: {first_angle:.2f} degrees",
+                                        (25, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
                         cv2.putText(color_image, f"Diameter: {diameter_mm:.2f} mm",
-                                    (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                                    (25, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
 
                         cv2.imshow("Tandwiel Resultaat", color_image)
                         cv2.imwrite("resultaat_tandwiel.png", color_image)

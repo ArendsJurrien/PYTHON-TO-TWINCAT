@@ -53,11 +53,19 @@ try:
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
 
-        gray = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (1, 1), 0)
-        edges = cv2.Canny(blurred, lower_threshold, upper_threshold)
+        # Stap 1: Filter de zwarte klem uit het beeld
+        lower_black = np.array([0, 0, 0])      # Onderste grens voor zwart
+        upper_black = np.array([50, 50, 50])  # Bovenste grens voor zwart
+        mask_black = cv2.inRange(color_image, lower_black, upper_black)
+        mask_not_black = cv2.bitwise_not(mask_black)
+        color_image_filtered = cv2.bitwise_and(color_image, color_image, mask=mask_not_black)
 
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        # Stap 2: Ga verder met randdetectie en contouranalyse
+        gray_filtered = cv2.cvtColor(color_image_filtered, cv2.COLOR_BGR2GRAY)
+        blurred_filtered = cv2.GaussianBlur(gray_filtered, (1, 1), 0)
+        edges_filtered = cv2.Canny(blurred_filtered, lower_threshold, upper_threshold)
+
+        contours, _ = cv2.findContours(edges_filtered, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
         if contours:
             largest_contour = max(contours, key=cv2.contourArea)
@@ -82,10 +90,10 @@ try:
                         center_y_mm = y / pixels_per_mm
 
                         cv2.drawContours(color_image, [reordered_contour], -1, (0, 255, 0), 2)
-                        #cv2.circle(color_image, (int(x), int(y)), int(radius), (255, 0, 0), 2)
-                        #cv2.line(color_image, (int(x), 0), (int(x), color_image.shape[0]), (255, 0, 0), 2)
+                        cv2.circle(color_image, (int(x), int(y)), int(radius), (255, 0, 0), 2)
+                        cv2.line(color_image, (int(x), 0), (int(x), color_image.shape[0]), (255, 0, 0), 2)
                         cv2.putText(color_image, "X-axis", (int(x) + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                        #cv2.line(color_image, (0, int(y)), (color_image.shape[1], int(y)), (0, 255, 0), 2)
+                        cv2.line(color_image, (0, int(y)), (color_image.shape[1], int(y)), (0, 255, 0), 2)
                         cv2.putText(color_image, "Y-axis", (color_image.shape[1] - 100, int(y) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
                         x_coords_mm = []
@@ -98,22 +106,10 @@ try:
                             distance = np.sqrt(mm_x**2 + mm_y**2)
                             angle_rad = np.arctan2(mm_y, mm_x)
                             angle_deg = np.degrees(angle_rad)
-                            # Verplaats de 0 graden naar boven
-                            angle_deg = (angle_deg + 90) % 360
+                            angle_deg = (angle_deg + 90) % 360  # Verplaats 0 graden naar boven
 
                             x_coords_mm.append(distance)
                             y_coords_deg.append(angle_deg)
-
-                        # Bepaal de hoek van het eerste punt
-                        first_point_x, first_point_y = start_point[0]
-                        first_angle_rad = np.arctan2(first_point_y - y, first_point_x - x)
-                        first_angle_deg = np.degrees(first_angle_rad)
-                        first_angle_deg = (first_angle_deg + 90) % 360  # Aanpassen naar boven
-
-                        # Als het eerste punt 180 graden is, verschuif dan het hele contour
-                        if 170 <= first_angle_deg <= 190:
-                            angle_shift = 180  # Verschil om het eerste punt naar 0 graden te brengen
-                            y_coords_deg = [(angle + angle_shift) % 360 for angle in y_coords_deg]
 
                         with open(csv_filename, mode="w", newline="") as file:
                             writer = csv.writer(file)
@@ -122,23 +118,6 @@ try:
                                 writer.writerow([x, y])
 
                         send_coordinates_to_twincat(x_coords_mm, y_coords_deg)
-
-                        # Markeer het eerste punt en pas de hoek aan voor de visualisatie
-                        cv2.circle(color_image, (first_point_x, first_point_y), 3, (0, 0, 255), -1)
-                        cv2.putText(color_image, "First Point", (first_point_x + 10, first_point_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-
-                        # Visualiseer het eerste punt van x_coords_mm in het beeld
-                        if x_coords_mm:  # Controleer of de lijst niet leeg is
-                            first_x = x_coords_mm[0]
-                            first_angle = y_coords_deg[0]
-
-                            # Bepaal de pixelcoördinaten van het eerste punt (om te tekenen)
-                            first_point_x = int(x + first_x * pixels_per_mm)
-                            first_point_y = int(y)
-
-                            # Toon de coördinaten van het eerste punt op het beeld
-                            cv2.putText(color_image, f"First Coordinates: {first_x:.2f} mm, Angle: {first_angle:.2f} degrees",
-                                        (25, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
                         cv2.putText(color_image, f"Diameter: {diameter_mm:.2f} mm",
                                     (25, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)

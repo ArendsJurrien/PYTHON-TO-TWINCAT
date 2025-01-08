@@ -5,6 +5,9 @@ import time
 import csv
 import pyads
 
+timeout_seconds = 10
+start_time = time.time()
+
 # Functie voor het schrijven van de coördinaten naar TwinCAT
 def send_coordinates_to_twincat(x_coords, y_coords, plc_address="39.231.85.117.1.1", port=851):
     try:
@@ -23,6 +26,41 @@ def send_coordinates_to_twincat(x_coords, y_coords, plc_address="39.231.85.117.1
     except Exception as e:
         print(f"Error: {e}")
 
+# Functie voor het schrijven van timeout naar TwinCAT
+def send_text_to_twincat(text, plc_address="39.231.85.117.1.1", port=851):
+    try:
+        plc = pyads.Connection(plc_address, port)
+        plc.open()
+        
+        if plc.is_open:
+            # Schrijf het bericht naar de PLC
+            plc.write_by_name("Main.status_message", text, pyads.PLCTYPE_STRING)
+            print(f"Bericht '{text}' succesvol verzonden naar TwinCAT.")
+        else:
+            print("Kon geen verbinding maken met de PLC.")
+        
+        plc.close()
+    except Exception as e:
+        print(f"Fout bij verzenden: {e}")
+
+# Functie voor het schrijven van de status naar TwinCAT
+def send_text_to_twincat(text, plc_address="39.231.85.117.1.1", port=851):
+    try:
+        plc = pyads.Connection(plc_address, port)
+        plc.open()
+        
+        if plc.is_open:
+            # Schrijf het bericht naar de PLC
+            plc.write_by_name("Main.status_message", text, pyads.PLCTYPE_STRING)
+            print(f"Bericht '{text}' succesvol verzonden naar TwinCAT.")
+        else:
+            print("Kon geen verbinding maken met de PLC.")
+        
+        plc.close()
+    except Exception as e:
+        print(f"Fout bij verzenden: {e}")
+    
+
 # Initialiseer Intel RealSense D435 camera
 pipeline = rs.pipeline()
 config = rs.config()
@@ -39,8 +77,11 @@ min_diameter_mm = 40
 max_diameter_mm = 180
 csv_filename = "contour_coordinates_mm_&_degrees.csv"
 
+
 try:
     while True:
+        send_text_to_twincat("Searching for gear")
+
         time.sleep(2)
         frames = pipeline.wait_for_frames()
         color_frame = frames.get_color_frame()
@@ -49,6 +90,13 @@ try:
         if not color_frame or not depth_frame:
             print("Geen frames ontvangen. Probeer opnieuw.")
             continue
+      
+        #TIMEOUT TIMER
+        elapsed_time = time.time() - start_time
+        if elapsed_time > timeout_seconds:
+            #print("Timeout bereikt: geen tandwiel gevonden.")
+            send_text_to_twincat("JAAA. Geen tandwiel gevonden.")
+            break
 
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
@@ -80,6 +128,8 @@ try:
                     if min_diameter_mm <= diameter_mm <= max_diameter_mm:
                         center_x_mm = x / pixels_per_mm
                         center_y_mm = y / pixels_per_mm
+                         # If gear is found send the status
+                        send_text_to_twincat("Gear found")
 
                         cv2.drawContours(color_image, [reordered_contour], -1, (0, 255, 0), 2)
                         #cv2.circle(color_image, (int(x), int(y)), int(radius), (255, 0, 0), 2)
@@ -121,7 +171,9 @@ try:
                             for x, y in zip(x_coords_mm, y_coords_deg):
                                 writer.writerow([x, y])
 
+                        send_text_to_twincat("Sending coordinates")
                         send_coordinates_to_twincat(x_coords_mm, y_coords_deg)
+                        send_text_to_twincat("Coordinates succesfully sended")
 
                         # Markeer het eerste punt en pas de hoek aan voor de visualisatie
                         cv2.circle(color_image, (first_point_x, first_point_y), 3, (0, 0, 255), -1)
@@ -150,7 +202,7 @@ try:
                     else:
                         print(f"Contour genegeerd: diameter ({diameter_mm:.2f} mm) ligt niet tussen {min_diameter_mm} mm en {max_diameter_mm} mm.")
                 else:
-                    print("Geen object gevonden.")
+                    print("Geen juist object gevonden (>0 cm).")
         else:
             print("Geen contouren gevonden. Controleer het beeld en probeer opnieuw.")
 
