@@ -103,6 +103,16 @@ def set_restart_variable_false(plc, variable_name="Main.restart", value=False):
     except Exception as e:
         print(f"Error setting restart variable: {e}")
 
+## Function to set process completed to True in TwinCAT
+def set_process_completed_true(plc, variable_name="Main.coordinatesreceived", value=True):
+    try:
+        if plc.is_open:                                                         # Check if the PLC connection is open
+            plc.write_by_name(variable_name, value, pyads.PLCTYPE_BOOL)         # Set restart to True
+        else:
+            print("PLC connection is not open.")
+    except Exception as e:
+        print(f"Error setting restart variable: {e}")
+
 
 
 ### Main function of the programm
@@ -231,30 +241,31 @@ def main():
                                 first_angle_deg = np.degrees(first_angle_rad)   # Convert the angle to degrees
                                 first_angle_deg = (first_angle_deg + 90) % 360  # Adjust the angle to be 0 at the top
 
-                                # If the first point is at 180 degrees, shift the entire contour
+                                ## Shift the contour to 0 degrees if it's near 180 degrees
                                 if 170 <= first_angle_deg <= 190:
-                                    angle_shift = 180  # Shift the angle by 180 degrees to align the first point with 0 degrees
-                                    y_coords_deg = [(angle + angle_shift) % 360 for angle in y_coords_deg]  # Apply the angle shift to all angles
+                                    angle_shift = 180                           # Shift the angle by 180 degrees 
+                                    y_coords_deg = [(angle + angle_shift) % 360 for angle in y_coords_deg]              # Apply the angle shift to all angles
 
-                                # Write the coordinates to a CSV file
+                                ## Write the coordinates to a CSV file
                                 with open(csv_filename, mode="w", newline="") as file:
-                                    writer = csv.writer(file)  # Open the CSV file for writing
-                                    writer.writerow(["Distance (mm)", "Angle (degrees)"])  # Write the header
-                                    for x, y in zip(x_coords_mm, y_coords_deg):  # Write the distance and angle for each point
+                                    writer = csv.writer(file)                   # Open the CSV file 
+                                    writer.writerow(["Distance (mm)", "Angle (degrees)"])                               # Write distance and degrees to csv header
+                                    for x, y in zip(x_coords_mm, y_coords_deg): # Write the distance and angle for each point
                                         writer.writerow([x, y])
 
-                                send_status_to_twincat("Sending coordinates", plc)  # Notify TwinCAT that coordinates are being sent
-                                send_coordinates_to_twincat(x_coords_mm, y_coords_deg)  # Send the coordinates to TwinCAT
-                                send_status_to_twincat("Coordinates successfully sent", plc)  # Confirm that coordinates were sent
+                                send_status_to_twincat("Sending coordinates", plc)  
+                                send_coordinates_to_twincat(x_coords_mm, y_coords_deg)  
+                                send_status_to_twincat("Coordinates successfully sent", plc)  
 
-                                # Mark the first point and adjust the angle for visualization
-                                cv2.circle(color_image, (first_point_x, first_point_y), 3, (0, 0, 255), -1)  # Draw a red circle at the first point
+                                ## Mark the first point and adjust the angle for visualization
+                                cv2.circle(color_image, (first_point_x, first_point_y), 3, (0, 0, 255), -1)             # Draw a red circle at the first point
                                 cv2.putText(color_image, "First Point", (first_point_x + 10, first_point_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)  # Label the first point
 
-                                # Visualize the first point of the contour (in mm) on the image
-                                if x_coords_mm:  # Check if the x_coords_mm list is not empty
-                                    first_x = x_coords_mm[0]  # Get the first x-coordinate in mm
-                                    first_angle = y_coords_deg[0]  # Get the first angle in degrees
+
+                                ## Image the result in PNG
+                                if x_coords_mm:                                 # Check the x_coords_mm list 
+                                    first_x = x_coords_mm[0]                    # Get the first x-coordinate 
+                                    first_angle = y_coords_deg[0]               # Get the first angle
 
                                     # Determine the pixel coordinates of the first point for drawing
                                     first_point_x = int(x + first_x * pixels_per_mm)
@@ -268,33 +279,33 @@ def main():
                                 cv2.putText(color_image, f"Diameter: {diameter_mm:.2f} mm",
                                             (25, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
 
-                                # Show the result and save the image
+                                # Save the image
+                                cv2.imwrite("Result_gear.png", color_image)     # Save the result image to a file
                                 
-                                cv2.imwrite("Result_gear.png", color_image)  # Save the result image to a file
-                                
-                                # For demonstration purposes, stop processing here
-                                send_status_to_twincat("Process completed", plc)  # Notify TwinCAT that the process is complete
-                                send_next_move_to_twincat("Ready for new input", plc)  # Notify TwinCAT that the system is ready for new input
-                                print("Processing completed.")  # Log the completion of processing
-                                processing = False  # Set processing to False, awaiting the next pulse
-                                set_restart_variable_false(plc, variable_name="Main.restart", value=False)  # Reset the restart flag in PLC
-                                break  # Exit the loop
+                                # Stop processing here
+                                send_status_to_twincat("Process completed", plc)  
+                                send_next_move_to_twincat("Ready for new input", plc) 
+                                print("Processing completed.")  
+                                processing = False                              # Set processing to False, awaiting the next pulse
+                                set_restart_variable_false(plc, variable_name="Main.restart", value=False) 
+                                set_process_completed_true(plc, variable_name="Main.coordinatesreceived", value=True) 
+                                break                                           # Exit the current processing loop and restart the main loop
 
                             else:
-                                print(f"Ignoring contour: diameter ({diameter_mm:.2f} mm) is not between {min_diameter_mm} mm and {max_diameter_mm} mm.")  # Log if the diameter is out of range
+                                print(f"Object: diameter ({diameter_mm:.2f} mm) is not between {min_diameter_mm} mm and {max_diameter_mm} mm.")  # Log if the diameter is out of range
                         else:
-                            print("Object not circular")  # Log if no object is found or if the depth is invalid
+                            print("Object not circular") 
                 else:
-                    print("No contours found")  # Log if no contours are found
+                    print("No contours found")  
                 
-    except KeyboardInterrupt:  # Handle manual interruption of the program
-        print("Program interrupted manually.")  # Log that the program was manually interrupted
+    except KeyboardInterrupt:                                                   # Manual interruption of the program
+        print("Program interrupted manually.")  
     finally:
-        pipeline.stop()  # Stop the camera pipeline
-        plc.close()  # Close the connection to the PLC
-        cv2.destroyAllWindows()  # Close any OpenCV windows
+        pipeline.stop()                                                         # Stop the camera pipeline
+        plc.close()                                                             # Close the connection to the PLC
+        cv2.destroyAllWindows()                                                 # Close any OpenCV windows
 
-# Main function to run the script
+## Main function to run this script
 if __name__ == "__main__":
-    main()  # Execute the main function
+    main()                                                                      # Execute the main function
 
