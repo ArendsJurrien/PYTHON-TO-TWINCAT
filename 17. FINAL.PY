@@ -51,7 +51,6 @@ def reset_start_pulse(plc, variable_name="Main.startprocess"):
     try:
         if plc.is_open:
             plc.write_by_name(variable_name, False, pyads.PLCTYPE_BOOL)
-            print("Startpuls gereset naar False.")
         else:
             print("PLC-verbinding is niet open.")
     except Exception as e:
@@ -84,7 +83,6 @@ def set_restart_variable_true(plc, variable_name="Main.restart", value=True):
     try:
         if plc.is_open:
             plc.write_by_name(variable_name, value, pyads.PLCTYPE_BOOL)  # Use BOOL for true/false values
-            print(f"Restart variable set to {value}.")
         else:
             print("PLC connection is not open.")
     except Exception as e:
@@ -94,7 +92,6 @@ def set_restart_variable_false(plc, variable_name="Main.restart", value=False):
     try:
         if plc.is_open:
             plc.write_by_name(variable_name, value, pyads.PLCTYPE_BOOL)  # Use BOOL for true/false values
-            print(f"Restart variable set to {value}.")
         else:
             print("PLC connection is not open.")
     except Exception as e:
@@ -151,7 +148,6 @@ def main():
                 # Controleer op timeout
                 if elapsed_time > timeout_seconds:
                     send_status_to_twincat("Timeout occured. No gear found.", plc)
-                    print("Timeout bereikt: geen tandwiel gevonden.")
                     processing = False
                     break
 
@@ -275,7 +271,7 @@ def main():
                             else:
                                 print(f"Contour genegeerd: diameter ({diameter_mm:.2f} mm) ligt niet tussen {min_diameter_mm} mm en {max_diameter_mm} mm.")
                         else:
-                            print("Geen juist object gevonden (>0 cm).")
+                            print("No object found juist object gevonden (>0 cm).")
                 else:
                     print("Geen contouren gevonden. Controleer het beeld en probeer opnieuw.")
                 
